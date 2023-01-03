@@ -1,0 +1,208 @@
+C51 COMPILER V9.60.0.0   IIC                                                               04/07/2022 11:09:39 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE IIC
+OBJECT MODULE PLACED IN .\Objects\iic.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Head\iic.c OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Head) DEBUG OBJECTEXTEND PR
+                    -INT(.\Listings\iic.lst) TABS(2) OBJECT(.\Objects\iic.obj)
+
+line level    source
+
+   1          /*
+   2            程序说明: IIC总线驱动程序
+   3            软件环境: Keil uVision 4.10 
+   4            硬件环境: CT107单片机综合实训平台 8051，12MHz
+   5            日    期: 2011-8-9
+   6          */
+   7          
+   8          #include <STC15F2K60S2.H>
+   9          
+  10          #include "intrins.h"
+  11          #include "iic.h"
+  12          
+  13          #define DELAY_TIME 40   //修改：将5修改为40
+  14          
+  15          #define SlaveAddrW 0xA0
+  16          #define SlaveAddrR 0xA1
+  17          
+  18          //总线引脚定义
+  19          sbit SDA = P2^1;  /* 数据线 */
+  20          sbit SCL = P2^0;  /* 时钟线 */
+  21          
+  22          void IIC_Delay(unsigned char i)
+  23          {
+  24   1          do{_nop_();}
+  25   1          while(i--);        
+  26   1      }
+  27          //总线启动条件
+  28          void IIC_Start(void)
+  29          {
+  30   1          SDA = 1;
+  31   1          SCL = 1;
+  32   1          IIC_Delay(DELAY_TIME);
+  33   1          SDA = 0;
+  34   1          IIC_Delay(DELAY_TIME);
+  35   1          SCL = 0;  
+  36   1      }
+  37          
+  38          //总线停止条件
+  39          void IIC_Stop(void)
+  40          {
+  41   1          SDA = 0;
+  42   1          SCL = 1;
+  43   1          IIC_Delay(DELAY_TIME);
+  44   1          SDA = 1;
+  45   1          IIC_Delay(DELAY_TIME);
+  46   1      }
+  47          
+  48          //发送应答
+  49          void IIC_SendAck(bit ackbit)
+  50          {
+  51   1          SCL = 0;
+  52   1          SDA = ackbit;           // 0：应答，1：非应答
+  53   1          IIC_Delay(DELAY_TIME);
+  54   1          SCL = 1;
+C51 COMPILER V9.60.0.0   IIC                                                               04/07/2022 11:09:39 PAGE 2   
+
+  55   1          IIC_Delay(DELAY_TIME);
+  56   1          SCL = 0; 
+  57   1          SDA = 1;
+  58   1          IIC_Delay(DELAY_TIME);
+  59   1      }
+  60          
+  61          //等待应答
+  62          bit IIC_WaitAck(void)
+  63          {
+  64   1          bit ackbit;
+  65   1        
+  66   1          SCL  = 1;
+  67   1          IIC_Delay(DELAY_TIME);
+  68   1          ackbit = SDA;
+  69   1          SCL = 0;
+  70   1          IIC_Delay(DELAY_TIME);
+  71   1          return ackbit;
+  72   1      }
+  73          
+  74          //通过I2C总线发送数据
+  75          void IIC_SendByte(unsigned char byt)
+  76          {
+  77   1          unsigned char i;
+  78   1      
+  79   1          for(i=0; i<8; i++)
+  80   1          {
+  81   2              SCL  = 0;
+  82   2              IIC_Delay(DELAY_TIME);
+  83   2              if(byt & 0x80) SDA  = 1;
+  84   2              else SDA  = 0;
+  85   2              IIC_Delay(DELAY_TIME);
+  86   2              SCL = 1;
+  87   2              byt <<= 1;
+  88   2              IIC_Delay(DELAY_TIME);
+  89   2          }
+  90   1          SCL  = 0;  
+  91   1      }
+  92          
+  93          //从I2C总线上接收数据
+  94          unsigned char IIC_RecByte(void)
+  95          {
+  96   1          unsigned char i, da;
+  97   1          for(i=0; i<8; i++)
+  98   1          {   
+  99   2            SCL = 1;
+ 100   2        IIC_Delay(DELAY_TIME);
+ 101   2        da <<= 1;
+ 102   2        if(SDA) da |= 1;
+ 103   2        SCL = 0;
+ 104   2        IIC_Delay(DELAY_TIME);
+ 105   2          }
+ 106   1          return da;    
+ 107   1      }
+ 108          
+ 109          
+ 110          /*************************以下为自己添加的************************************/
+ 111          //154542 154642
+ 112          unsigned char PCF8591_Get_ADC(unsigned char adc_address)
+ 113          {
+ 114   1        unsigned char ADC_data;
+ 115   1        IIC_Start();          //IIC起始信号
+ 116   1        IIC_SendByte(0x90);     //总线寻址，进入写模式
+C51 COMPILER V9.60.0.0   IIC                                                               04/07/2022 11:09:39 PAGE 3   
+
+ 117   1        IIC_WaitAck();          //等待从机应答响应
+ 118   1          IIC_SendByte(adc_address);  //写通道号，可以00,01,02,03
+ 119   1        IIC_WaitAck();          //等待从机应答响应
+ 120   1          IIC_Stop();             //停止IIC
+ 121   1        
+ 122   1        IIC_Start();                //IIC起始信号
+ 123   1        IIC_SendByte(0x91);       //总线寻址，进入读模式
+ 124   1        IIC_WaitAck();              //等待从机应答响应
+ 125   1        ADC_data = IIC_RecByte();     //读一个字节
+ 126   1        IIC_SendAck(0);           //主机向从机作出非应答响应,释放SDA
+ 127   1        IIC_Stop();             //停止IIC
+ 128   1      
+ 129   1        return ADC_data;      //返回一个0~255之间的AD结果
+ 130   1      }
+ 131          
+ 132          void adc_set(unsigned char dat) //DAC输出
+ 133          {
+ 134   1        EA=0;
+ 135   1        IIC_Start(); 
+ 136   1        IIC_SendByte(0x90); // 地址+写
+ 137   1        IIC_WaitAck();
+ 138   1        IIC_SendByte(0x40);// DAC输出模式
+ 139   1        IIC_WaitAck();
+ 140   1        IIC_SendByte(dat);  ;//DAC写入数据
+ 141   1        IIC_WaitAck();
+ 142   1        IIC_Stop();
+ 143   1        EA=1;
+ 144   1      }
+ 145          
+ 146          void AT24C02_write(unsigned char add, unsigned char dat)//AT24C02写数据
+ 147          {
+ 148   1        EA=0;
+ 149   1        IIC_Start();
+ 150   1        IIC_SendByte(SlaveAddrW);
+ 151   1        IIC_WaitAck();
+ 152   1        IIC_SendByte(add);
+ 153   1        IIC_WaitAck();
+ 154   1        IIC_SendByte(dat);
+ 155   1        IIC_WaitAck();
+ 156   1        IIC_Stop();
+ 157   1        EA=1;
+ 158   1        IIC_Delay(200);//重点
+ 159   1      }
+ 160          
+ 161          unsigned char AT24C02_read(add)//AT24C02读数据
+ 162          {
+ 163   1        unsigned char dat;
+ 164   1        EA=0;
+ 165   1        IIC_Start();
+ 166   1        IIC_SendByte(SlaveAddrW);
+ 167   1        IIC_WaitAck();
+ 168   1        IIC_SendByte(add);
+ 169   1        IIC_WaitAck();
+ 170   1        IIC_Start();
+ 171   1        IIC_SendByte(SlaveAddrR);
+ 172   1        IIC_WaitAck();
+ 173   1        dat=IIC_RecByte();
+ 174   1        IIC_SendAck(0);
+ 175   1        IIC_Stop();
+ 176   1        EA=1;
+ 177   1        return dat;
+ 178   1      }
+C51 COMPILER V9.60.0.0   IIC                                                               04/07/2022 11:09:39 PAGE 4   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    338    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       2
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
