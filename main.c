@@ -131,6 +131,7 @@ void S12out()
 void S13out()
 {
 	model=1-model;
+	//Ä£Ê½ÇÐ»»
 } 
 
 void S16out()
@@ -148,6 +149,7 @@ void S17out()
 	{
 		tem_settle=tem_settle-1;
 		if(tem_settle<=10) tem_settle=10;
+		
 	}
 	
 }
