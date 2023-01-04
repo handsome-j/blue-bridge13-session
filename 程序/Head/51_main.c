@@ -40,6 +40,13 @@ void System_Init()
 	Enable138(0);
 
 }
+/*
+num
+4 LED
+5 继电器
+6 数码管位选
+7 数码管断码
+*/
 void Enable138(unsigned char num)
 {
 	P2&=0x1f;
